@@ -2,6 +2,7 @@ library(git2rdata)
 library(shiny)
 library(tidyverse)
 library(effectclass)
+library(digest)
 library(INBOtheme)
 
 soort_a <- read_vc("soort_a")
@@ -143,16 +144,50 @@ define_user_input <- function() {
     trend_a = factor(names(trend)), trend_b = factor(names(trend)),
     uncertainty_a = factor(names(uncertainty)),
     uncertainty_b = factor(names(uncertainty)),
-    y_scale_a = factor(names(y_scale)), y_scale_b = factor(names(y_scale))
+    y_scale_a = factor(names(y_scale)), y_scale_b = factor(names(y_scale)),
+    a = 0L, b = 0L
   ) %>%
     filter(
       (.data$href_a != .data$href_b) | (.data$pref_a != .data$pref_b) |
         (.data$trend_a != .data$trend_b) | (.data$y_scale_a != .data$y_scale_b) |
         (.data$uncertainty_a != .data$uncertainty_b)
-    ) %>%
-    mutate(id = row_number()) -> full_grid
-  full_grid %>%
-    mutate(a = 0L, b = 0L)
+    ) -> full_grid
+  if (is_git2rdata("user_input")) {
+    read_vc("user_input") %>%
+      complete(
+        href_a = factor(names(href)), href_b = factor(names(href)),
+        pref_a = factor(names(pref)), pref_b = factor(names(pref)),
+        trend_a = factor(names(trend)), trend_b = factor(names(trend)),
+        uncertainty_a = factor(names(uncertainty)),
+        uncertainty_b = factor(names(uncertainty)),
+        y_scale_a = factor(names(y_scale)), y_scale_b = factor(names(y_scale)),
+        session = 1,
+        fill = list(a = 0, b = 0)
+      ) %>%
+      mutate(
+        id = map_chr(
+          paste(
+            .data$href_a, .data$href_b, .data$pref_a, .data$pref_b,
+            .data$trend_a, .data$trend_b, .data$uncertainty_a,
+            .data$uncertainty_b, .data$y_scale_a, .data$y_scale_b, .data$session
+          ),
+          sha1
+        )
+      )
+  } else {
+    full_grid %>%
+      mutate(
+        session = 1,
+        id = map_chr(
+          paste(
+            .data$href_a, .data$href_b, .data$pref_a, .data$pref_b,
+            .data$trend_a, .data$trend_b, .data$uncertainty_a,
+            .data$uncertainty_b, .data$y_scale_a, .data$y_scale_b, .data$session
+          ),
+          sha1
+        )
+      )
+  }
 }
 
 get_information <- function(x, variable) {
@@ -224,9 +259,8 @@ server <- function(input, output) {
       return(NULL)
     }
     sample_combination(data$user_input) %>%
-      select(-.data$a, -.data$b) -> tmp
-    tmp %>%
-      pivot_longer(-.data$id, values_ptypes = character()) %>%
+      select(-.data$a, -.data$b) %>%
+      pivot_longer(c(-"id", -"session"), values_ptypes = character()) %>%
       extract(.data$name, c("element", "level"), "(.*)_(.*)") %>%
       pivot_wider(names_from = .data$level, values_from = .data$value)
   })
@@ -334,11 +368,19 @@ server <- function(input, output) {
   observeEvent(input$kies_a, {
     data$user_input[data$user_input$id == combination()$id, "a"] <-
       data$user_input[data$user_input$id == combination()$id, "a"] + 1
+    data$user_input %>%
+      filter(.data$a > 0 | .data$b > 0) %>%
+      write_vc(file = "user_input", sorting = "id")
+    data$base <- sample(names(base_plot), 1)
   })
 
   observeEvent(input$kies_b, {
     data$user_input[data$user_input$id == combination()$id, "b"] <-
       data$user_input[data$user_input$id == combination()$id, "b"] + 1
+    data$user_input %>%
+      filter(.data$a > 0 | .data$b > 0) %>%
+      write_vc(file = "user_input", sorting = "id")
+    data$base <- sample(names(base_plot), 1)
   })
 }
 
