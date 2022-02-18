@@ -336,7 +336,7 @@ server <- function(input, output) {
         p <- p + h
       }
     }
-    h <- href[[df$b[df$element == "pref"]]]
+    h <- pref[[df$b[df$element == "pref"]]]
     if (!is.null(h)) {
       if (inherits(h, "list")) {
         for (z in h) {
