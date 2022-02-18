@@ -3,8 +3,8 @@
   optimize: yes
   NA string: NA
   sorting: naar
-  hash: 871e90cb1687e0a7e490eb86bf32a8de160e111c
-  data_hash: 2b0478eb49dc3d3ce9b99067341cac27791a1b97
+  hash: 46d968d412d56f69d95691b361257170630bdb0e
+  data_hash: 5baf2fd6f66a44280e60c6c22d60910118064112
 naar:
   class: integer
 schatting:
@@ -65,3 +65,5 @@ interpretatie:
   ordered: no
 wijziging:
   class: character
+sd:
+  class: numeric

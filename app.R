@@ -1,6 +1,7 @@
 library(git2rdata)
 library(shiny)
 library(tidyverse)
+library(effectclass)
 library(INBOtheme)
 
 soort_a <- read_vc("soort_a")
@@ -104,9 +105,24 @@ uncertainty <- list(
     aes(x = naar, ymin = lcl, ymax = ucl),
     alpha = ribbon_opacity
   ),
+  ribbon_fan = stat_fan(aes(x = naar, y = schatting, link_sd = sd)),
   rect = geom_rect(
     aes(xmin = naar - 0.5, xmax = naar + 0.5, ymin = lcl, ymax = ucl),
     alpha = ribbon_opacity
+  ),
+  rect_fan = stat_fan(
+    aes(xmin = naar - 0.5, xmax = naar + 0.5, y = schatting, link_sd = sd),
+    geom = "rect"
+  ),
+  rect_fan_kleur = list(
+    stat_fan(
+      aes(
+        xmin = naar - 0.5, xmax = naar + 0.5, y = schatting, link_sd = sd,
+        fill = klasse
+      ),
+      geom = "rect"
+    ),
+    scale_fill_manual(values = kleurgradient)
   ),
   rect_kleur = list(
     geom_rect(
