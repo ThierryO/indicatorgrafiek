@@ -35,8 +35,44 @@ index_labels <- function(x) {
 }
 base_plot <- list(
   a = ggplot(soort_a), b = ggplot(soort_b), c = ggplot(soort_c),
-  d = ggplot(soort_d), e = ggplot(soort_e)
+  d = ggplot(soort_d), e = ggplot(soort_e),
+  am = soort_a %>%
+    mutate(
+      schatting = -.data$schatting, old = -.data$ucl, ucl = -.data$lcl,
+      lcl = .data$old,
+      klasse = classification(.data$lcl, .data$ucl, log(drempel))
+    ) %>%
+    ggplot(),
+  bm = soort_b %>%
+    mutate(
+      schatting = -.data$schatting, old = -.data$ucl, ucl = -.data$lcl,
+      lcl = .data$old,
+      klasse = classification(.data$lcl, .data$ucl, log(drempel))
+    ) %>%
+    ggplot(),
+  cm = soort_c %>%
+    mutate(
+      schatting = -.data$schatting, old = -.data$ucl, ucl = -.data$lcl,
+      lcl = .data$old,
+      klasse = classification(.data$lcl, .data$ucl, log(drempel))
+    ) %>%
+    ggplot(),
+  dm = soort_d %>%
+    mutate(
+      schatting = -.data$schatting, old = -.data$ucl, ucl = -.data$lcl,
+      lcl = .data$old,
+      klasse = classification(.data$lcl, .data$ucl, log(drempel))
+    ) %>%
+    ggplot(),
+  em = soort_e %>%
+    mutate(
+      schatting = -.data$schatting, old = -.data$ucl, ucl = -.data$lcl,
+      lcl = .data$old,
+      klasse = classification(.data$lcl, .data$ucl, log(drempel))
+    ) %>%
+    ggplot()
 )
+
 y_scale <- list(
   index = scale_y_continuous(
     "index (2007 = 100)", breaks = index_breaks, labels = index_labels
@@ -209,9 +245,8 @@ get_information <- function(x, variable) {
     ) %>%
     transmute(
       element = variable, .data$value,
-      prop = (.data$wins + 1) / sum(.data$wins + 1),
-      shannon = sum(-.data$prop * log(.data$prop)),
-      prop = .data$prop / (.data$tests + 1)
+      prop = pmax(.data$wins, 1) / sum(pmax(.data$wins, 1)),
+      shannon = sum(-.data$prop * log(.data$prop))
     )
 }
 
@@ -243,7 +278,7 @@ ui <- fluidPage(
       actionButton("kies_b", label = "kies B")
     ),
     mainPanel = mainPanel(
-      width = 11, plotOutput("graph_a"), plotOutput("graph_b")
+      width = 8, plotOutput("graph_a"), plotOutput("graph_b")
     )
   )
 )
