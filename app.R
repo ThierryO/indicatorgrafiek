@@ -174,51 +174,57 @@ uncertainty <- list(
 )
 
 define_user_input <- function() {
+  alternative <- sprintf("%s:%s",
+     c(
+       rep("href", length(href)), rep("pref", length(pref)),
+       rep("trend", length(trend)), rep("uncertainty", length(uncertainty)),
+       rep("y_scale", length(y_scale))
+     ),
+     c(
+       names(href), names(pref), names(trend), names(uncertainty),
+       names(y_scale)
+     )
+  )
   expand_grid(
-    href_a = factor(names(href)), href_b = factor(names(href)),
-    pref_a = factor(names(pref)), pref_b = factor(names(pref)),
-    trend_a = factor(names(trend)), trend_b = factor(names(trend)),
-    uncertainty_a = factor(names(uncertainty)),
-    uncertainty_b = factor(names(uncertainty)),
-    y_scale_a = factor(names(y_scale)), y_scale_b = factor(names(y_scale)),
-    a = 0L, b = 0L
+    href = factor(names(href)), pref = factor(names(pref)),
+    trend = factor(names(trend)), uncertainty = factor(names(uncertainty)),
+    y_scale = factor(names(y_scale)), alternative = alternative
   ) %>%
+    extract(.data$alternative, c("element", "value"), "(.*):(.*)") %>%
     filter(
-      (.data$href_a != .data$href_b) | (.data$pref_a != .data$pref_b) |
-        (.data$trend_a != .data$trend_b) | (.data$y_scale_a != .data$y_scale_b) |
-        (.data$uncertainty_a != .data$uncertainty_b)
+      !(.data$element == "href" & .data$href == .data$value),
+      !(.data$element == "pref" & .data$pref == .data$value),
+      !(.data$element == "trend" & .data$trend == .data$value),
+      !(.data$element == "uncertainty" & .data$uncertainty == .data$value),
+      !(.data$element == "y_scale" & .data$y_scale == .data$value)
+    ) %>%
+    mutate(
+      a = 0L, b = 0L, element = factor(.data$element),
+      value = factor(.data$value)
     ) -> full_grid
   if (is_git2rdata("user_input")) {
-    read_vc("user_input") %>%
-      complete(
-        href_a = factor(names(href)), href_b = factor(names(href)),
-        pref_a = factor(names(pref)), pref_b = factor(names(pref)),
-        trend_a = factor(names(trend)), trend_b = factor(names(trend)),
-        uncertainty_a = factor(names(uncertainty)),
-        uncertainty_b = factor(names(uncertainty)),
-        y_scale_a = factor(names(y_scale)), y_scale_b = factor(names(y_scale)),
-        session = 1,
-        fill = list(a = 0, b = 0)
-      ) %>%
+    old <- read_vc("user_input")
+    full_grid %>%
       mutate(
+        session = 1L,
         id = map_chr(
           paste(
-            .data$href_a, .data$href_b, .data$pref_a, .data$pref_b,
-            .data$trend_a, .data$trend_b, .data$uncertainty_a,
-            .data$uncertainty_b, .data$y_scale_a, .data$y_scale_b, .data$session
+            .data$href, .data$pref, .data$trend, .data$uncertainty,
+            .data$y_scale, .data$element, .data$value, .data$session
           ),
           sha1
         )
-      )
+      ) %>%
+      anti_join(old, by = "id") %>%
+      bind_rows(old)
   } else {
     full_grid %>%
       mutate(
-        session = 1,
+        session = 1L,
         id = map_chr(
           paste(
-            .data$href_a, .data$href_b, .data$pref_a, .data$pref_b,
-            .data$trend_a, .data$trend_b, .data$uncertainty_a,
-            .data$uncertainty_b, .data$y_scale_a, .data$y_scale_b, .data$session
+            .data$href, .data$pref, .data$trend, .data$uncertainty,
+            .data$y_scale, .data$element, .data$value, .data$session
           ),
           sha1
         )
@@ -228,11 +234,11 @@ define_user_input <- function() {
 
 get_information <- function(x, variable) {
   x %>%
+    filter(.data$element == variable) %>%
     select(
-      var_a = .data[[paste0(variable, "_a")]], .data$a,
-      var_b = .data[[paste0(variable, "_b")]], .data$b
+      var_a = .data[[variable]], .data$a,
+      var_b = .data$value, .data$b
     ) %>%
-    filter(.data$var_a != .data$var_b) %>%
     pivot_longer(
       c(-"a", -"b"), names_to = "test", values_ptypes = character()
     ) %>%
@@ -261,8 +267,8 @@ sample_combination <- function(x) {
       slice_sample(n = 1, weight_by = .data$prop) -> selected
     x %>%
       filter(
-        (.data[[paste0(selected$element, "_a")]] == selected$value) |
-        (.data[[paste0(selected$element, "_b")]] == selected$value)
+        (.data[[selected$element]] == selected$value) |
+        (.data$element == selected$element & .data$value == selected$value)
       ) -> x
     to_do <- to_do[to_do != selected$element]
   }
@@ -286,23 +292,33 @@ ui <- fluidPage(
 server <- function(input, output) {
   data <- reactiveValues(
     base = sample(names(base_plot), 1),
-    user_input = define_user_input()
+    user_input = define_user_input(),
+    df = NULL
   )
 
   combination <- reactive({
-    if (nrow(data$user_input) == 0) {
-      return(NULL)
-    }
-    sample_combination(data$user_input) %>%
+    sc <- sample_combination(data$user_input)
+    change_element <- paste0(as.character(sc$element), "_b")
+    sc %>%
       select(-.data$a, -.data$b) %>%
+      rename(
+        href_a = .data$href, pref_a = .data$pref, trend_a = .data$trend,
+        uncertainty_a = .data$uncertainty, y_scale_a = .data$y_scale
+      ) %>%
+      mutate(
+        href_b = .data$href_a, pref_b = .data$pref_a, trend_b = .data$trend_a,
+        uncertainty_b = .data$uncertainty_a, y_scale_b = .data$y_scale_a,
+        !!change_element := .data$value
+      ) %>%
+      select(-.data$element, -.data$value) %>%
       pivot_longer(c(-"id", -"session"), values_ptypes = character()) %>%
       extract(.data$name, c("element", "level"), "(.*)_(.*)") %>%
       pivot_wider(names_from = .data$level, values_from = .data$value)
   })
 
   output$graph_a <- renderPlot({
-    df <- combination()
-    if (is.null(df)) {
+    if (is.null(data$df)) {
+      data$df <- combination()
       return(NULL)
     }
     p <- base_plot[[data$base]] +
@@ -310,8 +326,8 @@ server <- function(input, output) {
       theme(
         axis.title.x = element_blank(), plot.title = element_text(hjust = 0)
       ) +
-      y_scale[[df$a[df$element == "y_scale"]]]
-    h <- href[[df$a[df$element == "href"]]]
+      y_scale[[data$df$a[data$df$element == "y_scale"]]]
+    h <- href[[data$df$a[data$df$element == "href"]]]
     if (!is.null(h)) {
       if (inherits(h, "list")) {
         for (z in h) {
@@ -321,7 +337,7 @@ server <- function(input, output) {
         p <- p + h
       }
     }
-    h <- href[[df$a[df$element == "pref"]]]
+    h <- pref[[data$df$a[data$df$element == "pref"]]]
     if (!is.null(h)) {
       if (inherits(h, "list")) {
         for (z in h) {
@@ -331,7 +347,7 @@ server <- function(input, output) {
         p <- p + h
       }
     }
-    h <- uncertainty[[df$a[df$element == "uncertainty"]]]
+    h <- uncertainty[[data$df$a[data$df$element == "uncertainty"]]]
     if (inherits(h, "list")) {
       for (z in h) {
         p <- p + z
@@ -339,7 +355,7 @@ server <- function(input, output) {
     } else {
       p <- p + h
     }
-    h <- trend[[df$a[df$element == "trend"]]]
+    h <- trend[[data$df$a[data$df$element == "trend"]]]
     if (inherits(h, "list")) {
       for (z in h) {
         p <- p + z
@@ -351,17 +367,16 @@ server <- function(input, output) {
   })
 
   output$graph_b <- renderPlot({
-    df <- combination()
-    if (is.null(df)) {
+    if (is.null(data$df)) {
       return(NULL)
     }
     p <- base_plot[[data$base]] +
-      ggtitle("B") +
+      ggtitle(paste("B", data$df$element[data$df$a != data$df$b])) +
       theme(
         axis.title.x = element_blank(), plot.title = element_text(hjust = 0)
       ) +
-      y_scale[[df$b[df$element == "y_scale"]]]
-    h <- href[[df$b[df$element == "href"]]]
+      y_scale[[data$df$b[data$df$element == "y_scale"]]]
+    h <- href[[data$df$b[data$df$element == "href"]]]
     if (!is.null(h)) {
       if (inherits(h, "list")) {
         for (z in h) {
@@ -371,7 +386,7 @@ server <- function(input, output) {
         p <- p + h
       }
     }
-    h <- pref[[df$b[df$element == "pref"]]]
+    h <- pref[[data$df$b[data$df$element == "pref"]]]
     if (!is.null(h)) {
       if (inherits(h, "list")) {
         for (z in h) {
@@ -381,7 +396,7 @@ server <- function(input, output) {
         p <- p + h
       }
     }
-    h <- uncertainty[[df$b[df$element == "uncertainty"]]]
+    h <- uncertainty[[data$df$b[data$df$element == "uncertainty"]]]
     if (inherits(h, "list")) {
       for (z in h) {
         p <- p + z
@@ -389,7 +404,7 @@ server <- function(input, output) {
     } else {
       p <- p + h
     }
-    h <- trend[[df$b[df$element == "trend"]]]
+    h <- trend[[data$df$b[data$df$element == "trend"]]]
     if (inherits(h, "list")) {
       for (z in h) {
         p <- p + z
@@ -407,6 +422,7 @@ server <- function(input, output) {
       filter(.data$a > 0 | .data$b > 0) %>%
       write_vc(file = "user_input", sorting = "id")
     data$base <- sample(names(base_plot), 1)
+    data$df <- combination()
   })
 
   observeEvent(input$kies_b, {
@@ -416,6 +432,7 @@ server <- function(input, output) {
       filter(.data$a > 0 | .data$b > 0) %>%
       write_vc(file = "user_input", sorting = "id")
     data$base <- sample(names(base_plot), 1)
+    data$df <- combination()
   })
 }
 
