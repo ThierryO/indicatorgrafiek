@@ -195,7 +195,7 @@ define_user_input <- function(root = ".") {
       a = 0L, b = 0L, element = factor(.data$element),
       value = factor(.data$value)
     ) -> full_grid
-  if (is_git2rdata("user_input", root = root)) {
+  if (file_test("-d", root) && is_git2rdata("user_input", root = root)) {
     old <- read_vc("user_input", root = root)
     full_grid %>%
       mutate(
@@ -252,6 +252,8 @@ get_information <- function(x, variable, correction = 1) {
 }
 
 sample_combination <- function(x) {
+  x %>%
+    mutate(prop = 1) -> x
   to_do <- c("href", "pref", "trend", "uncertainty", "y_scale")
   while (length(to_do)) {
     proportions <- map_dfr(to_do, get_information, x = x)
@@ -264,10 +266,20 @@ sample_combination <- function(x) {
       filter(
         (.data[[selected$element]] == selected$value) |
           (.data$element == selected$element & .data$value == selected$value)
-      ) -> x
+      ) %>%
+      mutate(link = .data[[selected$element]]) %>%
+      inner_join(
+        x = proportions %>%
+          semi_join(selected, by = "element") %>%
+          select(link = .data$value, prop2 = .data$prop),
+        by = "link"
+      ) %>%
+      mutate(prop = .data$prop * .data$prop2) %>%
+      select(-.data$link, -.data$prop2) -> x
     to_do <- to_do[to_do != selected$element]
   }
   x %>%
-    slice_sample(n = 1)
+    slice_sample(n = 1, weight_by = .data$prop) %>%
+    select(-.data$prop)
 }
 

@@ -6,7 +6,7 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel = sidebarPanel(
       width = 1,
-      textInput("path", "output path", value = normalizePath(".")),
+      textInput("path", "output path", value = ""),
       actionButton("kies_a", label = "kies A"),
       actionButton("kies_b", label = "kies B")
     ),
@@ -17,7 +17,6 @@ ui <- fluidPage(
 )
 
 server <- function(input, output) {
-
   data <- reactiveValues(
     base = sample(names(base_plot), 1),
     user_input = define_user_input()
@@ -154,7 +153,7 @@ server <- function(input, output) {
   })
 
   observeEvent(input$kies_a, {
-    if (is.null(input$path)) {
+    if (!file_test("-d", input$path)) {
       showNotification("Please set data directory first", type = "error")
       return(NULL)
     }
@@ -168,7 +167,7 @@ server <- function(input, output) {
   })
 
   observeEvent(input$kies_b, {
-    if (is.null(input$path)) {
+    if (!file_test("-d", input$path)) {
       showNotification("Please set data directory first", type = "error")
       return(NULL)
     }
