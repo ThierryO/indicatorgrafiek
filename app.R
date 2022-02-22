@@ -41,7 +41,8 @@ server <- function(input, output) {
         !!change_element := .data$value
       ) %>%
       select(-.data$element, -.data$value) %>%
-      pivot_longer(c(-"id", -"session"), values_ptypes = character()) %>%
+      pivot_longer(c(-"id", -"session")) %>%
+      mutate(value = as.character(.data$value)) %>%
       extract(.data$name, c("element", "level"), "(.*)_(.*)") %>%
       pivot_wider(names_from = .data$level, values_from = .data$value)
   })

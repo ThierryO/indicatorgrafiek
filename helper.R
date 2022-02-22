@@ -1,8 +1,26 @@
-library(git2rdata)
-library(tidyverse)
-library(effectclass)
-library(digest)
-library(INBOtheme)
+if (!require(git2rdata)) {
+  install.packages("git2rdata")
+  library(git2rdata)
+}
+if (!require(tidyverse)) {
+  install.packages("tidyverse")
+  library(tidyverse)
+}
+if (!require(effectclass)) {
+  install.packages("effectclass", repos = "https://inbo.r-universe.dev")
+  library(effectclass)
+}
+if (!require(digest)) {
+  install.packages("digest")
+  library(digest)
+}
+if (!require(INBOtheme)) {
+  if (!require(remotes)) {
+    install.packages("remotes")
+  }
+  install_github("inbo/INBOtheme")
+  library(INBOtheme)
+}
 
 soort_a <- read_vc("soort_a")
 soort_b <- read_vc("soort_b")
@@ -235,7 +253,7 @@ get_information <- function(x, variable, correction = 1) {
       var_b = .data$value, .data$b
     ) %>%
     pivot_longer(
-      c(-"a", -"b"), names_to = "test", values_ptypes = character()
+      c(-"a", -"b"), names_to = "test", values_transform = as.character
     ) %>%
     mutate(
       win = ifelse(str_detect(.data$test, "_a"), .data$a, .data$b),
@@ -264,8 +282,9 @@ sample_combination <- function(x) {
       slice_sample(n = 1, weight_by = .data$prop) -> selected
     x %>%
       filter(
-        (.data[[selected$element]] == selected$value) |
-          (.data$element == selected$element & .data$value == selected$value)
+        (as.character(.data[[selected$element]]) == selected$value) |
+          (.data$element == selected$element &
+             as.character(.data$value) == selected$value)
       ) %>%
       mutate(link = .data[[selected$element]]) %>%
       inner_join(
@@ -282,4 +301,3 @@ sample_combination <- function(x) {
     slice_sample(n = 1, weight_by = .data$prop) %>%
     select(-.data$prop)
 }
-
