@@ -165,7 +165,7 @@ uncertainty <- list(
   )
 )
 
-define_user_input <- function() {
+define_user_input <- function(root = ".") {
   alternative <- sprintf(
     "%s:%s",
      c(
@@ -195,8 +195,8 @@ define_user_input <- function() {
       a = 0L, b = 0L, element = factor(.data$element),
       value = factor(.data$value)
     ) -> full_grid
-  if (is_git2rdata("user_input")) {
-    old <- read_vc("user_input")
+  if (is_git2rdata("user_input", root = root)) {
+    old <- read_vc("user_input", root = root)
     full_grid %>%
       mutate(
         session = sha1(as.list(Sys.getenv())),

@@ -6,6 +6,7 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel = sidebarPanel(
       width = 1,
+      textInput("path", "output path", value = normalizePath(".")),
       actionButton("kies_a", label = "kies A"),
       actionButton("kies_b", label = "kies B")
     ),
@@ -16,11 +17,15 @@ ui <- fluidPage(
 )
 
 server <- function(input, output) {
+
   data <- reactiveValues(
     base = sample(names(base_plot), 1),
-    user_input = define_user_input(),
-    df = NULL
+    user_input = define_user_input()
   )
+
+  observeEvent(input$path, {
+    data$user_input <- define_user_input(input$path)
+  })
 
   combination <- reactive({
     sc <- sample_combination(data$user_input)
@@ -149,21 +154,29 @@ server <- function(input, output) {
   })
 
   observeEvent(input$kies_a, {
+    if (is.null(input$path)) {
+      showNotification("Please set data directory first", type = "error")
+      return(NULL)
+    }
     data$user_input[data$user_input$id == data$df$id[1], "a"] <-
       data$user_input[data$user_input$id == data$df$id[1], "a"] + 1
     data$user_input %>%
       filter(.data$a > 0 | .data$b > 0) %>%
-      write_vc(file = "user_input", sorting = "id")
+      write_vc(file = "user_input", sorting = "id", root = input$path)
     data$base <- sample(names(base_plot), 1)
     data$df <- combination()
   })
 
   observeEvent(input$kies_b, {
+    if (is.null(input$path)) {
+      showNotification("Please set data directory first", type = "error")
+      return(NULL)
+    }
     data$user_input[data$user_input$id == data$df$id[1], "b"] <-
       data$user_input[data$user_input$id == data$df$id[1], "b"] + 1
     data$user_input %>%
       filter(.data$a > 0 | .data$b > 0) %>%
-      write_vc(file = "user_input", sorting = "id")
+      write_vc(file = "user_input", sorting = "id", root = input$path)
     data$base <- sample(names(base_plot), 1)
     data$df <- combination()
   })
