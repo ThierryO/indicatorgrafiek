@@ -8,10 +8,8 @@ output:
 ```{r setup, include=FALSE}
 library(knitr)
 opts_chunk$set(echo = FALSE)
-library(git2rdata)
-library(tidyverse)
+source("helper.R")
 library(INLA)
-library(INBOtheme)
 ```
 
 ```{r prepare-data}
@@ -170,7 +168,7 @@ model <- inla(
 )
 ```
 
-# Voorkeuren
+# Voorkeur per component
 
 ```{r prepare-plot-data}
 ds %>%
@@ -366,7 +364,7 @@ levels(type_effect$type) <- c(
   lijn.rect = "lijn + rechthoek", lijn.ribbon = "lijn + band"
 )[levels(type_effect$type)]
 levels(type_individual$effect) <- levels(type_effect$type)
-levels(fan_effect$fan) <- c("FALSE" = "een", "TRUE" = "meedere")[
+levels(fan_effect$fan) <- c("FALSE" = "een", "TRUE" = "meerdere")[
   levels(fan_effect$fan)
 ]
 levels(fan_individual$effect) <- levels(fan_effect$fan)
@@ -577,29 +575,35 @@ pca$loadings %>%
 # Modeloverzicht
 
 ```{r summary}
-summary(model)
-```
-
-```{r schatting, eval = FALSE}
-model$summary.fitted.values[is.na(ds$p), ] %>%
-  as_tibble() %>%
-  select(.data$mean, lcl = .data$`0.025quant`, ucl = .data$`0.975quant`) %>%
-  bind_cols(
-    ds %>%
-      filter(is.na(.data$p))
+inv <- function(x) {
+  1 / x
+}
+model$marginals.hyperpar %>%
+  map(inla.tmarginal, fun = inv) %>%
+  map_dfr(inla.zmarginal, silent = TRUE) %>%
+  select(.data$mean, lcl = .data$quant0.025, ucl = .data$quant0.975) %>%
+  mutate(
+    individueel = names(model$marginals.hyperpar) %>%
+      str_detect("_ai2"),
+    component = names(model$marginals.hyperpar) %>%
+      str_replace(".* for (.*)_ai.*", "\\1")
   ) %>%
-  arrange(desc(.data$lcl)) %>%
-  mutate_at(c("mean", "lcl", "ucl"), `*`, 100) %>%
-  mutate_at(c("mean", "lcl", "ucl"), sprintf, fmt = "%.1f%%") %>%
-  select(
-    .data$href, .data$pref, .data$type, .data$trend, .data$uncertainty,
-    .data$mean, .data$lcl, .data$ucl
+  pivot_wider(
+    names_from = .data$individueel, values_from = c("mean", "lcl", "ucl")
   ) %>%
-  head(20) %>%
-  kable()
+  ggplot(
+    aes(
+      # xmin = lcl_FALSE, xmax = ucl_FALSE, ymin = lcl_TRUE, ymax = ucl_TRUE,
+      x = mean_FALSE, y = mean_TRUE
+    )
+  ) +
+  geom_point() +
+  geom_text(aes(label = component), hjust = -0.2, vjust = -0.2) +
+  scale_x_continuous("gemeenschappelijke voorkeur", limits = c(0, NA)) +
+  scale_y_continuous("individuele voorkeur", limits = c(0, NA)) +
+  coord_fixed()
 ```
-
-```{r}
+```{r full-pca}
 bind_rows(
   kleur_individual %>%
     transmute(
@@ -664,3 +668,167 @@ pca$rotation %>%
   geom_text(aes(label = rowname)) + 
   coord_fixed()
 ```
+
+# Voorkeursgrafieken
+
+```{r schatting, eval = FALSE}
+model$summary.linear.predictor[is.na(ds$a), ] %>%
+  as_tibble() %>%
+  select(.data$mean, lcl = .data$`0.025quant`, ucl = .data$`0.975quant`) %>%
+  bind_cols(
+    ds %>%
+      filter(is.na(.data$p))
+  ) %>%
+  arrange(desc(.data$lcl)) %>%
+  select(
+    .data$href, .data$pref, .data$type, .data$trend, .data$uncertainty,
+    .data$mean, .data$lcl, .data$ucl
+  ) %>%
+  head(20)
+```
+
+```{r}
+type_effect %>%
+  select(.data$type, .data$mean) %>%
+  bind_rows(
+    type_individual %>%
+      select(type = .data$effect, .data$mean, .data$session)
+  ) %>%
+  group_by(.data$session) %>%
+  slice_max(order_by = .data$mean, n = 1) %>%
+  ungroup() %>%
+  select(-.data$mean) %>%
+  inner_join(
+    kleur_effect %>%
+      select(.data$kleur, .data$mean) %>%
+      bind_rows(
+        kleur_individual %>%
+          select(kleur = .data$effect, .data$mean, .data$session)
+      ) %>%
+      group_by(.data$session) %>%
+      slice_max(order_by = .data$mean, n = 1) %>%
+      ungroup() %>%
+      select(-.data$mean),
+    by = "session"
+  ) %>%
+  inner_join(
+    fan_effect %>%
+      select(.data$fan, .data$mean) %>%
+      bind_rows(
+        fan_individual %>%
+          select(fan = .data$effect, .data$mean, .data$session)
+      ) %>%
+      group_by(.data$session) %>%
+      slice_max(order_by = .data$mean, n = 1) %>%
+      ungroup() %>%
+      select(-.data$mean),
+    by = "session"
+  ) %>%
+  inner_join(
+    y_scale_effect %>%
+      select(.data$y_scale, .data$mean) %>%
+      bind_rows(
+        y_scale_individual %>%
+          select(y_scale = .data$effect, .data$mean, .data$session)
+      ) %>%
+      group_by(.data$session) %>%
+      slice_max(order_by = .data$mean, n = 1) %>%
+      ungroup() %>%
+      select(-.data$mean),
+    by = "session"
+  ) %>%
+  inner_join(
+    pref_effect %>%
+      select(.data$pref, .data$mean) %>%
+      bind_rows(
+        pref_individual %>%
+          select(pref = .data$effect, .data$mean, .data$session)
+      ) %>%
+      group_by(.data$session) %>%
+      slice_max(order_by = .data$mean, n = 1) %>%
+      ungroup() %>%
+      select(-.data$mean),
+    by = "session"
+  ) %>%
+  inner_join(
+    href_effect %>%
+      select(.data$href, .data$mean) %>%
+      bind_rows(
+        href_individual %>%
+          select(href = .data$effect, .data$mean, .data$session)
+      ) %>%
+      group_by(.data$session) %>%
+      slice_max(order_by = .data$mean, n = 1) %>%
+      ungroup() %>%
+      select(-.data$mean),
+    by = "session"
+  ) %>%
+  mutate(
+    across(!any_of("session"), as.character),
+    session = ifelse(
+      is.na(.data$session), "globaal", paste("individu", .data$session)
+    ),
+    trend = ifelse(
+      str_detect(.data$type, "lijn"),
+      "lijn",
+      ifelse(
+        .data$kleur %in% c("punt kleur", "beide kleur"), "kleur", "punt"
+      )
+    ),
+    uncertainty = ifelse(
+      str_detect(.data$type, "band"),
+      ifelse(str_detect(.data$fan, "meerdere"), "ribbon_fan", "ribbon"),
+      paste0(
+        ifelse(str_detect(.data$fan, "meerdere"), "rect_fan", "rect"),
+        ifelse(.data$kleur %in% c("interval kleur", "beide kleur"), "_kleur", "")
+      )
+    )
+  ) %>%
+  arrange(.data$session) -> ind_voorkeur
+for (i in seq_along(ind_voorkeur$session)) {
+    p <- base_plot[[1]] +
+      ggtitle(ind_voorkeur$session[i]) +
+      theme(
+        axis.title.x = element_blank(), plot.title = element_text(hjust = 0)
+      ) +
+      y_scale[[ind_voorkeur$y_scale[i]]]
+  h <- href[[ind_voorkeur$href[i]]]
+  if (!is.null(h)) {
+    if (inherits(h, "list")) {
+      for (z in h) {
+        p <- p + z
+      }
+    } else {
+      p <- p + h
+    }
+  }
+  h <- pref[[ind_voorkeur$pref[i]]]
+  if (!is.null(h)) {
+    if (inherits(h, "list")) {
+      for (z in h) {
+        p <- p + z
+      }
+    } else {
+      p <- p + h
+    }
+  }
+  h <- uncertainty[[ind_voorkeur$uncertainty[i]]]
+  if (inherits(h, "list")) {
+    for (z in h) {
+      p <- p + z
+    }
+  } else {
+    p <- p + h
+  }
+  h <- trend[[ind_voorkeur$trend[i]]]
+  if (inherits(h, "list")) {
+    for (z in h) {
+      p <- p + z
+    }
+  } else {
+    p <- p + h
+  }
+  print(p)
+}
+```
+
