@@ -217,7 +217,7 @@ define_user_input <- function(root = ".") {
     old <- read_vc("user_input", root = root)
     full_grid %>%
       mutate(
-        session = sha1(as.list(Sys.getenv())),
+        session = session_id(),
         id = map_chr(
           paste(
             .data$href, .data$pref, .data$trend, .data$uncertainty,
@@ -231,7 +231,7 @@ define_user_input <- function(root = ".") {
   } else {
     full_grid %>%
       mutate(
-        session = sha1(as.list(Sys.getenv())),
+        session = session_id(),
         id = map_chr(
           paste(
             .data$href, .data$pref, .data$trend, .data$uncertainty,
@@ -300,4 +300,14 @@ sample_combination <- function(x) {
   x %>%
     slice_sample(n = 1, weight_by = .data$prop) %>%
     select(-.data$prop)
+}
+session_id <- function() {
+  se <- as.list(Sys.getenv())
+  nok <- names(se) %in% c(
+    "GIO_LAUNCHED_DESKTOP_FILE_PID", "INVOCATION_ID", "JOURNAL_STEAM",
+    "MANAGERPID", "R_SESSION_TMPDIR", "RS_PPM_FD_READ", "RS_PPM_FD_WRITE",
+    "RS_SHARED_SECRET", "RSTUDIO_CONSOLE_WIDTH", "RSTUDIO_SESSION_PORT",
+    "SSH_AGENT_PID"
+  )
+  sha1(se[!nok])
 }
