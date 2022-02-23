@@ -375,133 +375,203 @@ levels(fan_individual$effect) <- levels(fan_effect$fan)
 ```{r type}
 ggplot(
   type_effect,
-  aes(x = type, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
+  aes(y = type, x = mean, xmin = `0.025quant`, xmax = `0.975quant`)
 ) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_errorbar() +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
   geom_point() +
-  scale_x_discrete("type figuur") +
-  scale_y_continuous("belang")
+  scale_y_discrete("type figuur") +
+  scale_x_continuous("belang")
 ```
 
 ```{r type-ind}
-ggplot(type_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
-  geom_hline(yintercept = 0, linetype = 2) +
+ggplot(type_individual, aes(y = effect, x = mean, xmin = lcl, xmax = ucl)) +
+  geom_vline(xintercept = 0, linetype = 2) +
   geom_errorbar() +
   geom_point() +
-  scale_x_discrete("type") +
-  scale_y_continuous("belang") +
+  scale_y_discrete("type") +
+  scale_x_continuous("belang") +
   facet_wrap(~session)
+```
+
+```{r type-pca}
+type_individual %>%
+  transmute(.data$session, effect = as.character(.data$effect), .data$mean) %>%
+  pivot_wider(names_from = .data$effect, values_from = .data$mean) %>%
+  select(-.data$session) %>%
+  as.matrix() %>%
+  princomp() -> pca
+points <- predict(pca) %>%
+  as.data.frame() %>%
+  mutate(rowname = row_number())
+pca$loadings %>%
+  unclass() %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  ggplot(aes(x = `Comp.1`, y = `Comp.2`)) +
+  geom_segment(
+    x = 0, y = 0, aes(xend =  `Comp.1`, yend = `Comp.2`),
+    arrow = arrow(length = unit(2, "mm"))
+  ) +
+  geom_text(data = points, aes(label = rowname), colour = inbo_hoofd) + 
+  geom_text(aes(label = rowname)) + 
+  coord_fixed()
 ```
 
 ```{r kleur}
 ggplot(
   kleur_effect,
-  aes(x = kleur, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
+  aes(y = kleur, x = mean, xmin = `0.025quant`, xmax = `0.975quant`)
 ) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_errorbar() +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
   geom_point() +
-  scale_x_discrete("kleur") +
-  scale_y_continuous("belang")
+  scale_y_discrete("kleur") +
+  scale_x_continuous("belang")
 ```
 
 ```{r kleur-ind}
-ggplot(kleur_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_errorbar() +
+ggplot(kleur_individual, aes(y = effect, x = mean, xmin = lcl, xmax = ucl)) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
   geom_point() +
-  scale_x_discrete("kleur") +
-  scale_y_continuous("belang") +
+  scale_y_discrete("kleur") +
+  scale_x_continuous("belang") +
   facet_wrap(~session)
 ```
 
+```{r kleur-pca}
+kleur_individual %>%
+  transmute(.data$session, effect = as.character(.data$effect), .data$mean) %>%
+  pivot_wider(names_from = .data$effect, values_from = .data$mean) %>%
+  select(-.data$session) %>%
+  as.matrix() %>%
+  princomp() -> pca
+points <- predict(pca) %>%
+  as.data.frame() %>%
+  mutate(rowname = row_number())
+pca$loadings %>%
+  unclass() %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  ggplot(aes(x = `Comp.1`, y = `Comp.2`)) +
+  geom_segment(
+    x = 0, y = 0, aes(xend =  `Comp.1`, yend = `Comp.2`),
+    arrow = arrow(length = unit(2, "mm"))
+  ) +
+  geom_text(data = points, aes(label = rowname), colour = inbo_hoofd) + 
+  geom_text(aes(label = rowname)) + 
+  coord_fixed()
+```
 
 ```{r fan}
 ggplot(
   fan_effect,
-  aes(x = fan, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
+  aes(y = fan, x = mean, xmin = `0.025quant`, xmax = `0.975quant`)
 ) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_errorbar() +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
   geom_point() +
-  scale_x_discrete("intervallen") +
-  scale_y_continuous("belang")
+  scale_y_discrete("intervallen") +
+  scale_x_continuous("belang")
 ```
 
 ```{r fan-ind}
-ggplot(fan_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
-  geom_hline(yintercept = 0, linetype = 2) +
+ggplot(fan_individual, aes(y = effect, x = mean, xmin = lcl, xmax = ucl)) +
+  geom_vline(xintercept = 0, linetype = 2) +
   geom_errorbar() +
   geom_point() +
-  scale_x_discrete("intervallen") +
-  scale_y_continuous("belang") +
+  scale_y_discrete("intervallen") +
+  scale_x_continuous("belang") +
   facet_wrap(~session)
 ```
-
 
 ```{r y-scale}
 ggplot(
   y_scale_effect,
-  aes(x = y_scale, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
+  aes(y = y_scale, x = mean, xmin = `0.025quant`, xmax = `0.975quant`)
 ) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_errorbar() +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
   geom_point() +
-  scale_x_discrete("schaal y as") +
-  scale_y_continuous("belang")
+  scale_y_discrete("schaal y as") +
+  scale_x_continuous("belang")
 ```
 
 ```{r yscale-ind}
-ggplot(y_scale_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_errorbar() +
+ggplot(y_scale_individual, aes(y = effect, x = mean, xmin = lcl, xmax = ucl)) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
   geom_point() +
-  scale_x_discrete("schaal y as") +
-  scale_y_continuous("belang") +
+  scale_y_discrete("schaal y as") +
+  scale_x_continuous("belang") +
   facet_wrap(~session)
 ```
 
 ```{r pref}
 ggplot(
-  pref_effect, aes(x = pref, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
+  pref_effect, aes(y = pref, x = mean, xmin = `0.025quant`, xmax = `0.975quant`)
 ) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_errorbar() +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
   geom_point() +
-  scale_x_discrete("referentiepunt") +
-  scale_y_continuous("belang")
+  scale_y_discrete("referentiepunt") +
+  scale_x_continuous("belang")
 ```
 
 ```{r pref-ind}
-ggplot(pref_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_errorbar() +
+ggplot(pref_individual, aes(y = effect, x = mean, xmin = lcl, xmax = ucl)) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
   geom_point() +
-  scale_x_discrete("referentiepunt") +
-  scale_y_continuous("belang") +
+  scale_y_discrete("referentiepunt") +
+  scale_x_continuous("belang") +
   facet_wrap(~session)
 ```
 
 ```{r href}
 ggplot(
-  href_effect, aes(x = href, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
+  href_effect, aes(y = href, x = mean, xmin = `0.025quant`, xmax = `0.975quant`)
 ) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_errorbar() +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
   geom_point() +
-  scale_x_discrete("referentielijn") +
-  scale_y_continuous("belang")
+  scale_y_discrete("referentielijn") +
+  scale_x_continuous("belang")
 ```
 
 ```{r href-ind}
-ggplot(href_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_errorbar() +
+ggplot(href_individual, aes(y = effect, x = mean, xmin = lcl, xmax = ucl)) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
   geom_point() +
-  scale_x_discrete("referentielijn") +
-  scale_y_continuous("belang") +
+  scale_y_discrete("referentielijn") +
+  scale_x_continuous("belang") +
   facet_wrap(~session)
+```
+
+```{r href-pca}
+href_individual %>%
+  transmute(.data$session, effect = as.character(.data$effect), .data$mean) %>%
+  pivot_wider(names_from = .data$effect, values_from = .data$mean) %>%
+  select(-.data$session) %>%
+  as.matrix() %>%
+  princomp() -> pca
+points <- predict(pca) %>%
+  as.data.frame() %>%
+  mutate(rowname = row_number())
+pca$loadings %>%
+  unclass() %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  ggplot(aes(x = `Comp.1`, y = `Comp.2`)) +
+  geom_segment(
+    x = 0, y = 0, aes(xend =  `Comp.1`, yend = `Comp.2`),
+    arrow = arrow(length = unit(2, "mm"))
+  ) +
+  geom_text(data = points, aes(label = rowname), colour = inbo_hoofd) + 
+  geom_text(aes(label = rowname)) + 
+  coord_fixed()
 ```
 
 # Modeloverzicht
@@ -527,4 +597,70 @@ model$summary.fitted.values[is.na(ds$p), ] %>%
   ) %>%
   head(20) %>%
   kable()
+```
+
+```{r}
+bind_rows(
+  kleur_individual %>%
+    transmute(
+      .data$session, effect = as.character(.data$effect), .data$mean,
+      component = "kleur"
+    ),
+  type_individual %>%
+    transmute(
+      .data$session, effect = as.character(.data$effect), .data$mean,
+      component = "type"
+    ),
+  href_individual %>%
+    transmute(
+      .data$session, effect = as.character(.data$effect), .data$mean,
+      component = "href"
+    )
+) %>%
+  transmute(
+    .data$session, .data$mean,
+    effect = paste(.data$component, .data$effect, sep = ":")
+  ) %>%
+  pivot_wider(names_from = .data$effect, values_from = .data$mean) %>%
+inner_join(
+  y_scale_individual %>%
+    select(.data$session, .data$effect, .data$mean) %>%
+    arrange(.data$effect) %>%
+    group_by(.data$session) %>%
+    summarise(y_scale = diff(.data$mean)),
+  by = "session"
+) %>%
+  inner_join(
+    fan_individual %>%
+      select(.data$session, .data$effect, .data$mean) %>%
+      arrange(.data$effect) %>%
+      group_by(.data$session) %>%
+      summarise(fan = diff(.data$mean)),
+    by = "session"
+  ) %>%
+  inner_join(
+    pref_individual %>%
+      select(.data$session, .data$effect, .data$mean) %>%
+      arrange(.data$effect) %>%
+      group_by(.data$session) %>%
+      summarise(pref = diff(.data$mean)),
+    by = "session"
+  ) %>%
+  select(-.data$session) %>%
+  as.matrix() -> ind_effect
+pca <- prcomp(ind_effect)
+points <- predict(pca) %>%
+  as.data.frame() %>%
+  mutate(rowname = row_number())
+pca$rotation %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+  geom_segment(
+    x = 0, y = 0, aes(xend =  PC1, yend = PC2),
+    arrow = arrow(length = unit(2, "mm"))
+  ) +
+  geom_text(data = points, aes(label = rowname), colour = inbo_hoofd) + 
+  geom_text(aes(label = rowname)) + 
+  coord_fixed()
 ```
