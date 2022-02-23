@@ -1,5 +1,5 @@
 ---
-title: "indicatoren"
+title: "Voorkeuren voor grafiek indicatoren"
 output:
   pdf_document: default
   html_document: default
@@ -11,14 +11,15 @@ opts_chunk$set(echo = FALSE)
 library(git2rdata)
 library(tidyverse)
 library(INLA)
-library(INBOmd)
+library(INBOtheme)
 ```
 
 ```{r prepare-data}
 list.files("data", pattern = ".tsv") %>%
   map_dfr(read_vc, root = "data") %>%
   mutate(
-    session = factor(.data$session),
+    session = factor(.data$session) %>%
+      as.integer(),
     type = str_detect(.data$trend, "lijn") %>%
       factor(levels = c(FALSE, TRUE), labels = c("punt", "lijn")) %>%
       interaction(
@@ -83,20 +84,17 @@ list.files("data", pattern = ".tsv") %>%
         .data$element == "trend",
         ifelse(str_detect(.data$value, "kleur"), "pk", "pb") %>%
           paste(
-            ifelse(str_detect(.data$uncertainty, "kleur"), "cik", "cip"),
-            sep = "."
-          ) %>%
-          factor(levels = levels(.data$kleur)) %>%
-          as.integer()
-        ,
+            ifelse(str_detect(.data$uncertainty, "kleur"), "cik", "cib")
+          ),
         ifelse(str_detect(.data$trend, "kleur"), "pk", "pb") %>%
           paste(
-            ifelse(str_detect(.data$value, "kleur"), "cik", "cip"),
-            sep = "."
-          ) %>%
-          factor(levels = levels(.data$kleur)) %>%
-          as.integer()
-      ),
+            ifelse(str_detect(.data$value, "kleur"), "cik", "cib")
+          )
+      ) %>%
+        factor(
+          levels = levels(.data$kleur)
+        ) %>%
+        as.integer(),
       .data$kleur_ai
     ),
     fan_ai = as.integer(.data$fan),
@@ -104,43 +102,83 @@ list.files("data", pattern = ".tsv") %>%
       as.integer(),
     n = .data$a + .data$b,
     p = .data$a / .data$n,
-    w = -1
-  ) -> ds 
+    w = -1,
+    href_ai2 = .data$href_ai, href_bi2 = .data$href_bi,
+    pref_ai2 = .data$pref_ai, pref_bi2 = .data$pref_bi,
+    type_ai2 = .data$type_ai, type_bi2 = .data$type_bi,
+    fan_ai2 = .data$fan_ai, fan_bi2 = .data$fan_bi,
+    y_scale_ai2 = .data$y_scale_ai, y_scale_bi2 = .data$y_scale_bi,
+    kleur_ai2 = .data$kleur_ai, kleur_bi2 = .data$kleur_bi
+  ) -> ds
 ds %>%
   distinct(
     .data$href_ai, .data$pref_ai, .data$type_ai, .data$y_scale_ai,
-    .data$fan_ai, .data$kleur_ai, .data$kleur_ai, .data$href, .data$pref,
-    .data$trend, .data$uncertainty, .data$y_scale, .data$type, .data$kleur
+    .data$fan_ai, .data$kleur_ai, .data$href, .data$pref, .data$trend, 
+    .data$uncertainty, .data$y_scale, .data$type, .data$kleur, .data$fan
   ) %>%
+  mutate(session = 1) %>%
   bind_rows(ds) -> ds
 ```
 
 ```{r model}
+common_prior <- list(
+  theta = list(prior = "pc.prec", param = c(0.5, 0.05))
+)
+id_prior <- list(
+  theta = list(prior = "pc.prec", param = c(0.25, 0.05))
+)
 model <- inla(
-  p ~ f(href_ai, model = "iid") + f(href_bi, w, copy = "href_ai") +
-    f(pref_ai, model = "iid") + f(pref_bi, w, copy = "pref_ai") +
-    f(y_scale_ai, model = "iid") + f(y_scale_bi, w, copy = "y_scale_ai") +
-    f(type_ai, model = "iid") + f(type_bi, w, copy = "type_ai") +
-    f(kleur_ai, model = "iid") + f(kleur_bi, w, copy = "kleur_ai") +
-    f(fan_ai, model = "iid") + f(fan_bi, w, copy = "fan_ai"),
+  a ~
+    f(href_ai, model = "iid", hyper = common_prior) +
+    f(href_bi, w, copy = "href_ai") +
+    f(pref_ai, model = "iid", hyper = common_prior) +
+    f(pref_bi, w, copy = "pref_ai") +
+    f(y_scale_ai, model = "iid", hyper = common_prior) +
+    f(y_scale_bi, w, copy = "y_scale_ai") +
+    f(type_ai, model = "iid", hyper = common_prior) +
+    f(type_bi, w, copy = "type_ai") +
+    f(kleur_ai, model = "iid", hyper = common_prior) +
+    f(kleur_bi, w, copy = "kleur_ai") +
+    f(fan_ai, model = "iid", hyper = common_prior) +
+    f(fan_bi, w, copy = "fan_ai") +
+    f(
+      href_ai2, model = "iid", replicate = session, hyper = id_prior
+    ) +
+    f(href_bi2, w, copy = "href_ai2", replicate = session) +
+    f(
+      pref_ai2, model = "iid", replicate = session, hyper = id_prior
+    ) +
+    f(pref_bi2, w, copy = "pref_ai2", replicate = session) +
+    f(
+      y_scale_ai2, model = "iid", replicate = session, hyper = id_prior
+    ) +
+    f(y_scale_bi2, w, copy = "y_scale_ai2", replicate = session) +
+    f(
+      type_ai2, model = "iid", replicate = session, hyper = id_prior
+    ) +
+    f(type_bi2, w, copy = "type_ai2", replicate = session) +
+    f(
+      kleur_ai2, model = "iid", replicate = session, hyper = id_prior
+    ) +
+    f(kleur_bi2, w, copy = "kleur_ai2", replicate = session) +
+    f(
+      fan_ai2, model = "iid", replicate = session, hyper = id_prior
+    ) +
+    f(fan_bi2, w, copy = "fan_ai2", replicate = session),
   family = "binomial", data = ds, Ntrials = ds$n,
   control.compute = list(waic = TRUE), control.predictor = list(link = 1)
 )
 ```
 
-```{r}
+# Voorkeuren
+
+```{r prepare-plot-data}
 ds %>%
   distinct(.data$kleur, .data$kleur_ai) %>%
   inner_join(
     model$summary.random$kleur_ai, by = c("kleur_ai" = "ID")
   ) %>%
   mutate(kleur = reorder(.data$kleur, .data$mean)) -> kleur_effect
-levels(kleur_effect$kleur) <- c(
-  pk.cik = "beide kleur", pb.cib = "beide blauw", pk.cib = "punt kleur",
-  pb.cik = "interval kleur"
-)[
-  levels(kleur_effect$kleur)
-]
 ds %>%
   distinct(.data$fan, .data$fan_ai) %>%
   filter(!is.na(.data$fan)) %>%
@@ -176,9 +214,165 @@ limits <- c(
     kleur_effect$`0.975quant`, fan_effect$`0.975quant`
   )
 )
+model$summary.random$href_ai2 %>%
+  select(.data$ID, .data$mean, .data$sd) %>%
+  group_by(.data$ID) %>%
+  mutate(session = row_number()) %>%
+  ungroup() %>%
+  inner_join(
+    model$summary.random$href_ai %>%
+      select(.data$ID, common_mean = .data$mean, common_sd = .data$sd),
+    by = "ID"
+  ) %>%
+  inner_join(
+    ds %>%
+      distinct(.data$href, .data$href_ai) %>%
+      mutate(effect = factor(.data$href, levels = levels(href_effect$href))),
+    by = c("ID" = "href_ai")
+  ) %>%
+  mutate(
+    mean = .data$mean + .data$common_mean,
+    sd = sqrt(.data$sd ^ 2 + .data$common_sd ^ 2),
+    lcl = qnorm(0.025, mean = .data$mean, sd = .data$sd),
+    ucl = qnorm(0.975, mean = .data$mean, sd = .data$sd)
+  ) -> href_individual
+model$summary.random$pref_ai2 %>%
+  select(.data$ID, .data$mean, .data$sd) %>%
+  group_by(.data$ID) %>%
+  mutate(session = row_number()) %>%
+  ungroup() %>%
+  inner_join(
+    model$summary.random$pref_ai %>%
+      select(.data$ID, common_mean = .data$mean, common_sd = .data$sd),
+    by = "ID"
+  ) %>%
+  inner_join(
+    ds %>%
+      distinct(.data$pref, .data$pref_ai) %>%
+      mutate(effect = factor(.data$pref, levels = levels(pref_effect$pref))),
+    by = c("ID" = "pref_ai")
+  ) %>%
+  mutate(
+    mean = .data$mean + .data$common_mean,
+    sd = sqrt(.data$sd ^ 2 + .data$common_sd ^ 2),
+    lcl = qnorm(0.025, mean = .data$mean, sd = .data$sd),
+    ucl = qnorm(0.975, mean = .data$mean, sd = .data$sd)
+  ) -> pref_individual
+model$summary.random$y_scale_ai2 %>%
+  select(.data$ID, .data$mean, .data$sd) %>%
+  group_by(.data$ID) %>%
+  mutate(session = row_number()) %>%
+  ungroup() %>%
+  inner_join(
+    model$summary.random$y_scale_ai %>%
+      select(.data$ID, common_mean = .data$mean, common_sd = .data$sd),
+    by = "ID"
+  ) %>%
+  inner_join(
+    ds %>%
+      distinct(.data$y_scale, .data$y_scale_ai) %>%
+      mutate(
+        effect = factor(.data$y_scale, levels = levels(y_scale_effect$y_scale))
+      ),
+    by = c("ID" = "y_scale_ai")
+  ) %>%
+  mutate(
+    mean = .data$mean + .data$common_mean,
+    sd = sqrt(.data$sd ^ 2 + .data$common_sd ^ 2),
+    lcl = qnorm(0.025, mean = .data$mean, sd = .data$sd),
+    ucl = qnorm(0.975, mean = .data$mean, sd = .data$sd)
+  ) -> y_scale_individual
+model$summary.random$type_ai2 %>%
+  select(.data$ID, .data$mean, .data$sd) %>%
+  group_by(.data$ID) %>%
+  mutate(session = row_number()) %>%
+  ungroup() %>%
+  inner_join(
+    model$summary.random$type_ai %>%
+      select(.data$ID, common_mean = .data$mean, common_sd = .data$sd),
+    by = "ID"
+  ) %>%
+  inner_join(
+    ds %>%
+      distinct(.data$type, .data$type_ai) %>%
+      mutate(
+        effect = factor(.data$type, levels = levels(type_effect$type))
+      ),
+    by = c("ID" = "type_ai")
+  ) %>%
+  mutate(
+    mean = .data$mean + .data$common_mean,
+    sd = sqrt(.data$sd ^ 2 + .data$common_sd ^ 2),
+    lcl = qnorm(0.025, mean = .data$mean, sd = .data$sd),
+    ucl = qnorm(0.975, mean = .data$mean, sd = .data$sd)
+  ) -> type_individual
+model$summary.random$fan_ai2 %>%
+  select(.data$ID, .data$mean, .data$sd) %>%
+  group_by(.data$ID) %>%
+  mutate(session = row_number()) %>%
+  ungroup() %>%
+  inner_join(
+    model$summary.random$fan_ai %>%
+      select(.data$ID, common_mean = .data$mean, common_sd = .data$sd),
+    by = "ID"
+  ) %>%
+  inner_join(
+    ds %>%
+      distinct(.data$fan, .data$fan_ai) %>%
+      mutate(
+        effect = factor(.data$fan, levels = levels(fan_effect$fan))
+      ),
+    by = c("ID" = "fan_ai")
+  ) %>%
+  mutate(
+    mean = .data$mean + .data$common_mean,
+    sd = sqrt(.data$sd ^ 2 + .data$common_sd ^ 2),
+    lcl = qnorm(0.025, mean = .data$mean, sd = .data$sd),
+    ucl = qnorm(0.975, mean = .data$mean, sd = .data$sd)
+  ) -> fan_individual
+model$summary.random$kleur_ai2 %>%
+  select(.data$ID, .data$mean, .data$sd) %>%
+  group_by(.data$ID) %>%
+  mutate(session = row_number()) %>%
+  ungroup() %>%
+  inner_join(
+    model$summary.random$kleur_ai %>%
+      select(.data$ID, common_mean = .data$mean, common_sd = .data$sd),
+    by = "ID"
+  ) %>%
+  inner_join(
+    ds %>%
+      distinct(.data$kleur, .data$kleur_ai) %>%
+      mutate(
+        effect = factor(.data$kleur, levels = levels(kleur_effect$kleur))
+      ),
+    by = c("ID" = "kleur_ai")
+  ) %>%
+  mutate(
+    mean = .data$mean + .data$common_mean,
+    sd = sqrt(.data$sd ^ 2 + .data$common_sd ^ 2),
+    lcl = qnorm(0.025, mean = .data$mean, sd = .data$sd),
+    ucl = qnorm(0.975, mean = .data$mean, sd = .data$sd)
+  ) -> kleur_individual
+levels(kleur_effect$kleur) <- c(
+  pk.cik = "beide kleur", pb.cib = "beide blauw", pk.cib = "punt kleur",
+  pb.cik = "interval kleur"
+)[
+  levels(kleur_effect$kleur)
+]
+levels(kleur_individual$effect) <- levels(kleur_effect$kleur)
+levels(type_effect$type) <- c(
+  punt.rect = "punt + rechthoek", punt.ribbon = "punt + band",
+  lijn.rect = "lijn + rechthoek", lijn.ribbon = "lijn + band"
+)[levels(type_effect$type)]
+levels(type_individual$effect) <- levels(type_effect$type)
+levels(fan_effect$fan) <- c("FALSE" = "een", "TRUE" = "meedere")[
+  levels(fan_effect$fan)
+]
+levels(fan_individual$effect) <- levels(fan_effect$fan)
 ```
 
-```{r}
+```{r type}
 ggplot(
   type_effect,
   aes(x = type, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
@@ -187,10 +381,20 @@ ggplot(
   geom_errorbar() +
   geom_point() +
   scale_x_discrete("type figuur") +
-  scale_y_continuous("effect")
+  scale_y_continuous("belang")
 ```
 
-```{r}
+```{r type-ind}
+ggplot(type_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_errorbar() +
+  geom_point() +
+  scale_x_discrete("type") +
+  scale_y_continuous("belang") +
+  facet_wrap(~session)
+```
+
+```{r kleur}
 ggplot(
   kleur_effect,
   aes(x = kleur, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
@@ -199,10 +403,21 @@ ggplot(
   geom_errorbar() +
   geom_point() +
   scale_x_discrete("kleur") +
-  scale_y_continuous("effect")
+  scale_y_continuous("belang")
 ```
 
-```{r}
+```{r kleur-ind}
+ggplot(kleur_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_errorbar() +
+  geom_point() +
+  scale_x_discrete("kleur") +
+  scale_y_continuous("belang") +
+  facet_wrap(~session)
+```
+
+
+```{r fan}
 ggplot(
   fan_effect,
   aes(x = fan, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
@@ -210,12 +425,22 @@ ggplot(
   geom_hline(yintercept = 0, linetype = 2) +
   geom_errorbar() +
   geom_point() +
-  scale_x_discrete("meerdere intervallen") +
-  scale_y_continuous("effect")
+  scale_x_discrete("intervallen") +
+  scale_y_continuous("belang")
+```
+
+```{r fan-ind}
+ggplot(fan_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_errorbar() +
+  geom_point() +
+  scale_x_discrete("intervallen") +
+  scale_y_continuous("belang") +
+  facet_wrap(~session)
 ```
 
 
-```{r}
+```{r y-scale}
 ggplot(
   y_scale_effect,
   aes(x = y_scale, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
@@ -224,10 +449,20 @@ ggplot(
   geom_errorbar() +
   geom_point() +
   scale_x_discrete("schaal y as") +
-  scale_y_continuous("effect")
+  scale_y_continuous("belang")
 ```
 
-```{r}
+```{r yscale-ind}
+ggplot(y_scale_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_errorbar() +
+  geom_point() +
+  scale_x_discrete("schaal y as") +
+  scale_y_continuous("belang") +
+  facet_wrap(~session)
+```
+
+```{r pref}
 ggplot(
   pref_effect, aes(x = pref, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
 ) +
@@ -235,10 +470,20 @@ ggplot(
   geom_errorbar() +
   geom_point() +
   scale_x_discrete("referentiepunt") +
-  scale_y_continuous("effect")
+  scale_y_continuous("belang")
 ```
 
-```{r}
+```{r pref-ind}
+ggplot(pref_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_errorbar() +
+  geom_point() +
+  scale_x_discrete("referentiepunt") +
+  scale_y_continuous("belang") +
+  facet_wrap(~session)
+```
+
+```{r href}
 ggplot(
   href_effect, aes(x = href, y = mean, ymin = `0.025quant`, ymax = `0.975quant`)
 ) +
@@ -246,10 +491,26 @@ ggplot(
   geom_errorbar() +
   geom_point() +
   scale_x_discrete("referentielijn") +
-  scale_y_continuous("effect")
+  scale_y_continuous("belang")
 ```
 
-```{r}
+```{r href-ind}
+ggplot(href_individual, aes(x = effect, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_errorbar() +
+  geom_point() +
+  scale_x_discrete("referentielijn") +
+  scale_y_continuous("belang") +
+  facet_wrap(~session)
+```
+
+# Modeloverzicht
+
+```{r summary}
+summary(model)
+```
+
+```{r schatting, eval = FALSE}
 model$summary.fitted.values[is.na(ds$p), ] %>%
   as_tibble() %>%
   select(.data$mean, lcl = .data$`0.025quant`, ucl = .data$`0.975quant`) %>%
@@ -257,6 +518,13 @@ model$summary.fitted.values[is.na(ds$p), ] %>%
     ds %>%
       filter(is.na(.data$p))
   ) %>%
-  arrange(desc(.data$mean))
+  arrange(desc(.data$lcl)) %>%
+  mutate_at(c("mean", "lcl", "ucl"), `*`, 100) %>%
+  mutate_at(c("mean", "lcl", "ucl"), sprintf, fmt = "%.1f%%") %>%
+  select(
+    .data$href, .data$pref, .data$type, .data$trend, .data$uncertainty,
+    .data$mean, .data$lcl, .data$ucl
+  ) %>%
+  head(20) %>%
+  kable()
 ```
-
